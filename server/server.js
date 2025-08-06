@@ -49,6 +49,7 @@ io.on('connection', (socket) => {
 
   // Chaque utilisateur rejoint une room à son ID pour messages privés directs
   socket.join(userId);
+  console.log(typeof userId)
 
   socket.on('registerUser', ({ userId, email }) => {
     activeUsers.push({ socketId: socket.id, userId, email });

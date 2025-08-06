@@ -39,7 +39,7 @@ function MessengerPage() {
   const currentMessages =
   view === 'groups'
     ? groupMessages[groups[activeGroup].id] || []
-    : contactMessages[contacts[activeContact]?.id] || [];
+    : contactMessages[contacts[activeContact]?.userId] || [];
 
 
   useEffect(() => {
@@ -64,9 +64,6 @@ function MessengerPage() {
       }
     };
 
-
-    s.on('message', handleIncomingMessage);
-
     // Écouter la liste des utilisateurs connectés
     s.on('activeUsers', (users) => {
       console.log(users)
@@ -74,10 +71,23 @@ function MessengerPage() {
       setContacts(users);
     });
 
+    s.on('private-message', ({ from, content }) => {
+      console.log(from, content)
+      // from est le userId de l’émetteur
+      setContactMessages(prev => ({
+        ...prev,
+        [from]: [
+          ...(prev[from] || []),
+          { sender: from, text: content }
+        ]
+      }));
+    });
+
   // Demander la liste des utilisateurs connectés dès la connexion
   s.emit('getActiveUsers');
 
   return () => {
+    s.off('private-message'); 
     s.off('message', handleIncomingMessage);
     s.off('activeUsers');
   };
@@ -88,10 +98,14 @@ function MessengerPage() {
     console.log('contacts mis à jour:', contacts);
   }, [contacts]);
 
+  useEffect(() => {
+    console.log(socket)
+  }, [socket])
+
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
 
-    const roomId = view === 'groups' ? groups[activeGroup].id : contacts[activeContact].id;
+    const roomId = view === 'groups' ? groups[activeGroup].id : contacts[activeContact].userId;
 
     const message = { sender: 'Me', text: newMessage.trim() };
 
@@ -108,13 +122,12 @@ function MessengerPage() {
       }));
     }
 
-    // Envoi socket au serveur (adapter selon protocole serveur)
-    if (socket) {
-      socket.emit('message', {
-        roomId,
-        sender: 'Me',
-        text: newMessage.trim(),
-        type: view === 'groups' ? 'group' : 'contact',
+    if (view === 'contacts' && socket) {
+      console.log(contacts[activeContact])
+      const to = contacts[activeContact].userId;
+      socket.emit('private-message', {
+        to: String(to),
+        content: newMessage.trim()
       });
     }
 
@@ -303,7 +316,12 @@ function MessengerPage() {
           <div style={styles.messages}>
             {currentMessages.map((msg, index) => (
               <div key={index}>
-                <strong style={styles.messageSender(msg.sender === 'Me')}>{msg.sender}</strong>
+                <strong>
+                  { msg.sender === 'Me'
+                      ? 'Me'
+                      : contacts.find(c => String(c.userId) === msg.sender)?.email || msg.sender
+                  }
+                </strong>
                 <p style={{ margin: 0 }}>{msg.text}</p>
               </div>
             ))}
