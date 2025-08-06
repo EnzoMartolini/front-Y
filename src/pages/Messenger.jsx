@@ -1,10 +1,127 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { getSocket } from '../socket';
 
 function MessengerPage() {
-  const [view, setView] = useState('groups'); // 'groups' ou 'contacts'
-  const [activeGroup, setActiveGroup] = useState(null);
-  const [activeContact, setActiveContact] = useState(null);
+  const [socket, setSocket] = useState(null);
 
+  const [view, setView] = useState('groups'); // 'groups' ou 'contacts'
+  const [activeGroup, setActiveGroup] = useState(0);
+  const [activeContact, setActiveContact] = useState(0);
+  const [newMessage, setNewMessage] = useState('');
+  const [contacts, setContacts] = useState([]);
+
+  const groups = [
+    { id: 'g1', name: 'Group 1' },
+    { id: 'g2', name: 'Group 2' },
+    { id: 'g3', name: 'Group 3' },
+    { id: 'g4', name: 'Group 4' },
+  ];
+
+
+
+  // Messages par ID (et non plus par nom)
+  const [groupMessages, setGroupMessages] = useState({
+    g1: [{ sender: 'Marie Rose', text: 'Bienvenue dans Group 1 !' }],
+    g2: [{ sender: 'Bob', text: 'Hello Group 2 !' }],
+    g3: [{ sender: 'Alice', text: 'Group 3 est actif.' }],
+    g4: [{ sender: 'Charlie', text: 'Ceci est Group 4.' }],
+  });
+
+  const [contactMessages, setContactMessages] = useState({
+    u1: [{ sender: 'Alice', text: 'Salut !' }, { sender: 'Me', text: 'Hey Alice !' }],
+    u2: [{ sender: 'Bob', text: 'Yo' }, { sender: 'Me', text: 'Quoi de neuf ?' }],
+    u3: [{ sender: 'Charlie', text: 'Bonjour' }],
+    u4: [{ sender: 'Me', text: 'Salut David !' }],
+  });
+
+  // Récupérer les messages affichés selon la vue et l'élément actif
+  const currentMessages =
+  view === 'groups'
+    ? groupMessages[groups[activeGroup].id] || []
+    : contactMessages[contacts[activeContact]?.id] || [];
+
+
+  useEffect(() => {
+    const s = getSocket();
+    setSocket(s);
+
+    // Écoute des messages entrants
+    const handleIncomingMessage = (message) => {
+      // message attendu = { roomId: string, sender: string, text: string, type: 'group' | 'contact' }
+      if (!message || !message.roomId) return;
+
+      if (message.type === 'group') {
+        setGroupMessages((prev) => ({
+          ...prev,
+          [message.roomId]: [...(prev[message.roomId] || []), { sender: message.sender, text: message.text }],
+        }));
+      } else if (message.type === 'contact') {
+        setContactMessages((prev) => ({
+          ...prev,
+          [message.roomId]: [...(prev[message.roomId] || []), { sender: message.sender, text: message.text }],
+        }));
+      }
+    };
+
+
+    s.on('message', handleIncomingMessage);
+
+    // Écouter la liste des utilisateurs connectés
+    s.on('activeUsers', (users) => {
+      console.log(users)
+      // users = tableau d'utilisateurs connectés, ex : [{ id, name }]
+      setContacts(users);
+    });
+
+  // Demander la liste des utilisateurs connectés dès la connexion
+  s.emit('getActiveUsers');
+
+  return () => {
+    s.off('message', handleIncomingMessage);
+    s.off('activeUsers');
+  };
+
+  }, []);
+
+  useEffect(() => {
+    console.log('contacts mis à jour:', contacts);
+  }, [contacts]);
+
+  const handleSendMessage = () => {
+    if (!newMessage.trim()) return;
+
+    const roomId = view === 'groups' ? groups[activeGroup].id : contacts[activeContact].id;
+
+    const message = { sender: 'Me', text: newMessage.trim() };
+
+    // Ajout local
+    if (view === 'groups') {
+      setGroupMessages((prev) => ({
+        ...prev,
+        [roomId]: [...(prev[roomId] || []), message],
+      }));
+    } else {
+      setContactMessages((prev) => ({
+        ...prev,
+        [roomId]: [...(prev[roomId] || []), message],
+      }));
+    }
+
+    // Envoi socket au serveur (adapter selon protocole serveur)
+    if (socket) {
+      socket.emit('message', {
+        roomId,
+        sender: 'Me',
+        text: newMessage.trim(),
+        type: view === 'groups' ? 'group' : 'contact',
+      });
+    }
+
+    setNewMessage('');
+  };
+
+  // Styles inchangés (copier-coller ou extraire dans un fichier séparé)
   const styles = {
     page: {
       display: 'flex',
@@ -59,7 +176,7 @@ function MessengerPage() {
       flexDirection: 'column',
       height: '100%',
       paddingBottom: '1rem',
-     },
+    },
     listContainer: {
       flex: 1,
       overflowY: 'auto',
@@ -103,7 +220,9 @@ function MessengerPage() {
       padding: 0,
       width: '2.5rem',
       height: '2.5rem',
-      filter: isActive ? 'brightness(1) saturate(3) drop-shadow(0 0 3px #1CD500)' : 'none',
+      filter: isActive
+        ? 'brightness(1) saturate(3) drop-shadow(0 0 3px #1CD500)'
+        : 'none',
       transition: 'filter 0.3s',
     }),
     iconImg: {
@@ -162,24 +281,6 @@ function MessengerPage() {
     },
   };
 
-  const groups = ['Group 1', 'Group 2', 'Group 3', 'Group 4'];
-  const contacts = ['Alice', 'Bob', 'Charlie', 'David'];
-
-  const messages = [
-    {
-      sender: 'Marie Rose',
-      text: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum vehicula ex eu augue dignissim, in imperdiet lacus convallis. Curabitur blandit convallis mi, at faucibus urna.`,
-    },
-    {
-      sender: 'John Doe',
-      text: `Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis.`,
-    },
-    {
-      sender: 'Me',
-      text: `NzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzNemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzzemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. zaekjhjdszzzzz`,
-    },
-  ];
-
   return (
     <div style={styles.page}>
       {/* Sidebar */}
@@ -187,115 +288,83 @@ function MessengerPage() {
         <div>
           <h1 style={styles.logo}>Y</h1>
           <div style={{ ...styles.flexCol, ...styles.navLinks }}>
-            <a href="/?main" style={{ color: 'white' }}>
-              Accueil
-            </a>
-            <a href="/?messenger" style={styles.green}>
-              Messagerie
-            </a>
-            <a href="/?profil" style={{ color: 'white' }}>
-              Mon profil
-            </a>
+            <Link to="/main" style={{ color: 'white' }}>Accueil</Link>
+            <Link to="/messenger" style={styles.green}>Messagerie</Link>
+            <Link to="/profil" style={{ color: 'white' }}>Mon profil</Link>
           </div>
         </div>
         <button style={styles.disconnectBtn}>Déconnexion</button>
       </div>
 
-      {/* Contenu principal : chatBox à gauche, groupes/contacts à droite */}
+      {/* Main Content */}
       <div style={styles.content}>
-        {/* Zone de discussion à gauche */}
+        {/* Chat Box */}
         <div style={styles.chatBox}>
           <div style={styles.messages}>
-            {messages.map((msg, i) => (
-              <div key={i}>
-                <strong style={styles.messageSender(msg.sender === 'Me')}>
-                  {msg.sender}
-                </strong>
+            {currentMessages.map((msg, index) => (
+              <div key={index}>
+                <strong style={styles.messageSender(msg.sender === 'Me')}>{msg.sender}</strong>
                 <p style={{ margin: 0 }}>{msg.text}</p>
               </div>
             ))}
           </div>
-
-          {/* Zone d’envoi */}
           <div style={styles.inputZone}>
-            <span role="img" aria-label="image" style={styles.green}>
-              🖼️
-            </span>
-            <input style={styles.input} placeholder="Dites quelque chose ..." />
-            <button style={styles.sendBtn}>Envoyer</button>
+            <span role="img" aria-label="image" style={styles.green}>🖼️</span>
+            <input
+              style={styles.input}
+              placeholder="Dites quelque chose ..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+            />
+            <button style={styles.sendBtn} onClick={handleSendMessage}>Envoyer</button>
           </div>
         </div>
 
-        {/* Colonne groupes/contacts à droite */}
+        {/* Groups / Contacts List */}
         <div style={styles.groups}>
           <h2>{view === 'groups' ? 'Messagerie de groupe' : 'Contacts'}</h2>
-
           <div style={styles.listContainer}>
             {(view === 'groups' ? groups : contacts).map((item, i) => (
               <button
-                key={i}
+                key={item.id}
                 style={styles.groupBtn(
-                  view === 'groups'
-                    ? i === activeGroup
-                    : i === activeContact
+                  (view === 'groups' ? activeGroup : activeContact) === i
                 )}
-                onClick={() =>
-                  view === 'groups'
-                    ? setActiveGroup(i)
-                    : setActiveContact(i)
-                }
+                onClick={() => {
+                  if (view === 'groups') setActiveGroup(i);
+                  else setActiveContact(i);
+                }}
               >
-                {view === 'groups' && (
-                  <img
-                    src={
-                      i === activeGroup
-                        ? '/src/images/silhouette-dutilisateurs-multiples-verte.png'
-                        : '/src/images/silhouette-dutilisateurs-multiples.png'
-                    }
-                    alt="Groupe"
-                    style={{ width: '1.5rem', height: '1.5rem' }}
-                  />
-                )}
-                {view === 'contacts' && (
-                  <img
-                    src="/src/images/utilisateur.png"
-                    alt="Contact"
-                    style={{ width: '1.5rem', height: '1.5rem' }}
-                  />
-                )}
-                {item}
+                {view === 'groups' ? item.name : item.email}
               </button>
             ))}
           </div>
-
-          {/* Boutons images juste au-dessus du bouton en bas */}
           <div style={styles.iconBtnsContainer}>
             <button
-              onClick={() => setView('groups')}
               style={styles.iconBtn(view === 'groups')}
-              title="Groupes"
+              onClick={() => setView('groups')}
+              aria-label="Afficher groupes"
             >
               <img
-                src="/src/images/silhouette-dutilisateurs-multiples.png"
-                alt="Groupes"
                 style={styles.iconImg}
+                src="/src/assets/icons/group.svg"
+                alt="group"
               />
             </button>
             <button
-              onClick={() => setView('contacts')}
               style={styles.iconBtn(view === 'contacts')}
-              title="Contacts"
+              onClick={() => setView('contacts')}
+              aria-label="Afficher contacts"
             >
               <img
-                src="/src/images/utilisateur.png"
-                alt="Contacts"
                 style={styles.iconImg}
+                src="/src/assets/icons/user.svg"
+                alt="user"
               />
             </button>
           </div>
-
-          {/* Bouton + */}
-          <button style={styles.actionBtn}>+</button>
+          <button style={styles.actionBtn}>Nouvelle discussion</button>
         </div>
       </div>
     </div>

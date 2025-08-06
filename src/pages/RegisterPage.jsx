@@ -1,3 +1,7 @@
+import { useState } from "react";
+import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+
 function RegisterPage() {
     const pageStyle = {
       height: '100vh',
@@ -59,35 +63,79 @@ function RegisterPage() {
     const buttonStyle = {
       height: '5.5vh',
     };
+
+    const [form, setForm] = useState({
+      username: '',
+      email: '',
+      password: ''
+    });
+  
+    const handleChange = (e) => {
+      setForm({
+        ...form,
+        [e.target.id]: e.target.value
+      });
+    };
+
+    const navigate = useNavigate();
+
+    const register = async (e) => {
+      e.preventDefault();
+
+      const {username, email, password} = form
+
+      try {
+        const res = await fetch ('http://localhost:3000/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ username, email, password })
+        })
+        const data = await res.json();
+
+        if(res.ok) {
+          console.log("Register réussi")
+          // Sauvegarde l'ID utilisateur
+          localStorage.setItem('userId', data.id);
+
+          // 🔁 Redirige vers /?main
+          navigate('/main');
+        } else {
+          console.log(data.error || "Erreur lors de l'inscription")
+        }
+      } catch (error) {
+
+        console.error(error)
+        console.error("Erreur lors de la connexion au serveur")
+        
+      }
+    }
   
     return (
       <div style={pageStyle}>
         <div style={leftStyle}>
           <h1>
-            <a href="/?home" style={logoStyle}>
+            <Link to="/home" style={logoStyle}>
               Y
-            </a>
+            </Link>
           </h1>
         </div>
         <div style={rightStyle}>
           <form style={formStyle}>
             <div style={inputBlockStyle}>
               <label htmlFor="username" style={labelStyle}>Nom d'utilisateur</label>
-              <input type="text" id="username" style={inputStyle} />
+              <input type="text" id="username" style={inputStyle} value={form.username} onChange={handleChange}/>
             </div>
             <div style={inputBlockStyle}>
               <label htmlFor="email" style={labelStyle}>Adresse mail</label>
-              <input type="email" id="email" style={inputStyle} />
+              <input type="email" id="email" style={inputStyle} value={form.email} onChange={handleChange}/>
             </div>
             <div style={inputBlockStyle}>
               <label htmlFor="password" style={labelStyle}>Mot de passe</label>
-              <input type="password" id="password" style={inputStyle} />
+              <input type="password" id="password" style={inputStyle} value={form.password} onChange={handleChange}/>
             </div>
-            <div style={inputBlockStyle}>
-              <label htmlFor="confirm" style={labelStyle}>Confirmer le mot de passe</label>
-              <input type="password" id="confirm" style={inputStyle} />
-            </div>
-            <button type="submit" style={buttonStyle}>S'inscrire</button>
+            <button type="submit" style={buttonStyle} onClick={register}>S'inscrire</button>
           </form>
         </div>
       </div>

@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 function MainPage() {
   const contacts = {
     'John Doe': { idUser: '2346354', img: 'john.png' },
@@ -137,9 +139,9 @@ function MainPage() {
         <div>
           <h1 style={styles.logo}>Y</h1>
           <div style={{ ...styles.flexCol, ...styles.navLinks }}>
-            <a  href="/?main"style={styles.green}>Accueil</a>
-            <a href="/?messenger" style={{color:'white'}}>Messagerie</a>
-            <a href="/?profil" style={{color:'white'}}>Mon profil</a>
+            <Link  to="/main"style={styles.green}>Accueil</Link>
+            <Link to="/messenger" style={{color:'white'}}>Messagerie</Link>
+            <Link to="/profil" style={{color:'white'}}>Mon profil</Link>
           </div>
         </div>
         <button style={styles.disconnectBtn}>Déconnexion</button>

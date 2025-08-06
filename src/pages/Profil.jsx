@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 function ProfilePage() {
   const [username, setUsername] = useState('Jean Dupont');
@@ -126,15 +127,15 @@ function ProfilePage() {
         <div>
           <h1 style={styles.logo}>Y</h1>
           <nav style={styles.navLinks}>
-            <a href="/?main" style={styles.navLink(false)}>
+            <Link to="/main" style={styles.navLink(false)}>
               Accueil
-            </a>
-            <a href="/?messenger" style={styles.navLink(false)}>
+            </Link>
+            <Link to="/messenger" style={styles.navLink(false)}>
               Messagerie
-            </a>
-            <a href="/?profil" style={styles.navLink(true)}>
+            </Link>
+            <Link to="/profil" style={styles.navLink(true)}>
               Mon profil
-            </a>
+            </Link>
           </nav>
         </div>
         <button style={styles.disconnectBtn}>Déconnexion</button>

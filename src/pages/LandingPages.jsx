@@ -1,3 +1,6 @@
+import { Navigate, useNavigate } from "react-router-dom"
+import { Link } from 'react-router-dom';
+
 function LandingPages () {
     const landingPageStyle = {
         justifyContent:"space-around",
@@ -33,6 +36,8 @@ function LandingPages () {
     const buttonStyle = {
         margin:"1%"
     }
+
+    const navigate = useNavigate()
     return <div id="landingPage" style={landingPageStyle}>
                 <div id="logo" style={divLeftStyle}><h1 id="logo" style={logoStyle}>Y</h1></div>
                 <span
@@ -49,8 +54,8 @@ function LandingPages () {
                         <h1 style={sloganStyle}>
                             L’écho du <span style={{ color: 'green' }}>monde</span>, autrement
                         </h1>
-                        <button style={buttonStyle}>Se connecter</button>
-                        <button style={buttonStyle}>S'inscrire</button>
+                        <button style={buttonStyle} onClick={() => navigate("/login")}>Se connecter</button>
+                        <button style={buttonStyle} onClick={() => navigate("/register")}>S'inscrire</button>
                     </div>
             </div>
 }
