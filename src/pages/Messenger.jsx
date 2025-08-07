@@ -8,7 +8,12 @@ function MessengerPage() {
   const [view, setView] = useState('groups'); // 'groups' ou 'contacts'
   const [activeGroup, setActiveGroup] = useState(0);
   const [activeContact, setActiveContact] = useState(0);
+
+  const [userId, setUserId] = useState(0)
+
+  const [historyMessages, setHistoryMessages] = useState([])
   const [newMessage, setNewMessage] = useState('');
+
   const [contacts, setContacts] = useState([]);
 
   const groups = [
@@ -46,6 +51,10 @@ function MessengerPage() {
     const s = getSocket();
     setSocket(s);
 
+    const stored = localStorage.getItem('user')
+    if (stored) {
+      setUserId(JSON.parse(stored))
+    }
     // Écoute des messages entrants
     const handleIncomingMessage = (message) => {
       // message attendu = { roomId: string, sender: string, text: string, type: 'group' | 'contact' }
@@ -101,6 +110,31 @@ function MessengerPage() {
   useEffect(() => {
     console.log(socket)
   }, [socket])
+
+  useEffect(() => {
+
+    const loadMessage = async () => {
+      try {
+        const url = `http://localhost:3000/message?fromUserId=${userId.id}&toUserId=${contacts[activeContact].userId}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Erreur réseau : ${response.status}`);
+        }
+        const data = await response.json();
+        setHistoryMessages(data);
+      } catch (error) {
+        console.error("Erreur lors du chargement des messages :", error);
+      }
+    };
+    
+
+    loadMessage()
+
+  }, [activeContact])
+
+  useEffect(() => {
+    console.log("hi");
+  }, [historyMessages])
 
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;

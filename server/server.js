@@ -4,6 +4,7 @@ import http from 'http';
 import { Server } from 'socket.io'; // <-- ICI, le bon import serveur
 import { registerUser } from './auth/register.js';
 import { loginUser } from './auth/login.js';
+import { savePrivateMessage, getPrivateMessage } from './messages/message.js';
 
 const app = express();
 app.use(cors());
@@ -30,13 +31,30 @@ app.post('/login', (req, res) => {
   }
 });
 
+app.get('/message', (req, res) => {
+  const { fromUserId, toUserId } = req.query;
+
+  if (!fromUserId || !toUserId) {
+    return res.status(400).json({ error: 'fromUserId et toUserId sont requis' });
+  }
+
+  try {
+    const message = getPrivateMessage(fromUserId, toUserId)
+    res.json(message)
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+
+})
+
 // Crée le serveur HTTP
 const server = http.createServer(app);
 
 // Initialise Socket.IO avec le serveur HTTP
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173', // ou l'adresse de ton front
+    origin: '*', // ou l'adresse de ton front
     methods: ['GET', 'POST']
   }
 });
@@ -75,6 +93,7 @@ io.on('connection', (socket) => {
   // Ancien événement de message privé si besoin de compatibilité
   socket.on('private-message', ({ to, content }) => {
     console.log(`📨 Message privé de ${userId} à ${to} : ${content}`);
+    savePrivateMessage(userId, to,content)
     io.to(to).emit('private-message', {
       from: userId,
       content,
