@@ -13,6 +13,7 @@ function MessengerPage() {
 
   const [historyMessages, setHistoryMessages] = useState([])
   const [newMessage, setNewMessage] = useState('');
+  const [contactMessages, setContactMessages] = useState({});
 
   const [contacts, setContacts] = useState([]);
 
@@ -33,12 +34,6 @@ function MessengerPage() {
     g4: [{ sender: 'Charlie', text: 'Ceci est Group 4.' }],
   });
 
-  const [contactMessages, setContactMessages] = useState({
-    u1: [{ sender: 'Alice', text: 'Salut !' }, { sender: 'Me', text: 'Hey Alice !' }],
-    u2: [{ sender: 'Bob', text: 'Yo' }, { sender: 'Me', text: 'Quoi de neuf ?' }],
-    u3: [{ sender: 'Charlie', text: 'Bonjour' }],
-    u4: [{ sender: 'Me', text: 'Salut David !' }],
-  });
 
   // Récupérer les messages affichés selon la vue et l'élément actif
   const currentMessages =
@@ -133,8 +128,14 @@ function MessengerPage() {
   }, [activeContact])
 
   useEffect(() => {
-    console.log("hi");
-  }, [historyMessages])
+    if (contacts[activeContact]) {
+      const userId = contacts[activeContact].userId;
+      setContactMessages(prev => ({
+        ...prev,
+        [userId]: historyMessages
+      }));
+    }
+  }, [historyMessages, activeContact]);
 
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
