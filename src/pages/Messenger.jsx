@@ -90,6 +90,22 @@ function MessengerPage() {
   // Demander la liste des utilisateurs connectés dès la connexion
   s.emit('getActiveUsers');
 
+  console.log(contacts)
+  if (contacts[activeContact]) {
+    const userId = contacts[activeContact].userId;
+
+    // Transformer les messages au bon format pour l'affichage
+    const formatted = historyMessages.map(msg => ({
+      sender: msg.fromUserId === userId ? userId : 'Me',
+      text: msg.content
+    }));
+
+    setContactMessages(prev => ({
+      ...prev,
+      [userId]: formatted
+    }));
+  }
+
   return () => {
     s.off('private-message'); 
     s.off('message', handleIncomingMessage);
@@ -130,12 +146,24 @@ function MessengerPage() {
   useEffect(() => {
     if (contacts[activeContact]) {
       const userId = contacts[activeContact].userId;
+  
+      // Transformer les messages au bon format pour l'affichage
+      const formatted = historyMessages.map(msg => ({
+        sender: msg.fromUserId === userId ? userId : 'Me',
+        text: msg.content
+      }));
+  
       setContactMessages(prev => ({
         ...prev,
-        [userId]: historyMessages
+        [userId]: formatted
       }));
     }
   }, [historyMessages, activeContact]);
+  
+
+  useEffect(() => {
+    console.log(contactMessages)
+  }, [contactMessages])
 
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
