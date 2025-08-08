@@ -13,15 +13,14 @@ export function getPrivateMessage(fromUserId, toUserId) {
   return messages;
 }
 
-export function savePrivateMessage(fromUserId, toUserId, content) {
+export function savePrivateMessage(fromUserId, toUserId, content, fromEmail) {
     const stmt = db.prepare(`
-      INSERT INTO message (fromUserId, toUserId, content)
-      VALUES (?, ?, ?)
+      INSERT INTO message (fromUserId, toUserId, content, email)
+      VALUES (?, ?, ?, ?)
     `);
-  
-    const info = stmt.run(fromUserId, toUserId, content);
+    
+    const info = stmt.run(fromUserId, toUserId, content, fromEmail);
   
     // info.lastInsertRowid contient l’ID du message inséré
-    console.log(info.lastInsertRowid)
     return info.lastInsertRowid;
   }

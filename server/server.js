@@ -91,12 +91,13 @@ io.on('connection', (socket) => {
   });
 
   // Ancien événement de message privé si besoin de compatibilité
-  socket.on('private-message', ({ to, content }) => {
+  socket.on('private-message', ({ to, content, fromEmail }) => {
     console.log(`📨 Message privé de ${userId} à ${to} : ${content}`);
-    savePrivateMessage(userId, to,content)
+    savePrivateMessage(userId, to,content, fromEmail)
     io.to(to).emit('private-message', {
       from: userId,
       content,
+      fromEmail: fromEmail
     });
   });
 

@@ -3,201 +3,146 @@ import { Link } from 'react-router-dom';
 import { getSocket } from '../socket';
 
 function MessengerPage() {
+  // États principaux
   const [socket, setSocket] = useState(null);
-
-  const [view, setView] = useState('groups'); // 'groups' ou 'contacts'
-  const [activeGroup, setActiveGroup] = useState(0);
   const [activeContact, setActiveContact] = useState(0);
-
-  const [userId, setUserId] = useState(0)
-
-  const [historyMessages, setHistoryMessages] = useState([])
+  const [userId, setUserId] = useState(null);
+  
+  // États des messages
+  const [historyMessages, setHistoryMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [contactMessages, setContactMessages] = useState({});
-
   const [contacts, setContacts] = useState([]);
 
-  const groups = [
-    { id: 'g1', name: 'Group 1' },
-    { id: 'g2', name: 'Group 2' },
-    { id: 'g3', name: 'Group 3' },
-    { id: 'g4', name: 'Group 4' },
-  ];
+  // Messages actuels à afficher
+  const currentMessages = contactMessages[contacts[activeContact]?.userId] || [];
 
-
-
-  // Messages par ID (et non plus par nom)
-  const [groupMessages, setGroupMessages] = useState({
-    g1: [{ sender: 'Marie Rose', text: 'Bienvenue dans Group 1 !' }],
-    g2: [{ sender: 'Bob', text: 'Hello Group 2 !' }],
-    g3: [{ sender: 'Alice', text: 'Group 3 est actif.' }],
-    g4: [{ sender: 'Charlie', text: 'Ceci est Group 4.' }],
-  });
-
-
-  // Récupérer les messages affichés selon la vue et l'élément actif
-  const currentMessages =
-  view === 'groups'
-    ? groupMessages[groups[activeGroup].id] || []
-    : contactMessages[contacts[activeContact]?.userId] || [];
-
-
+  // Initialisation de la socket et récupération des données utilisateur
   useEffect(() => {
-    const s = getSocket();
-    setSocket(s);
+    const socket = getSocket();
+    setSocket(socket);
 
-    const stored = localStorage.getItem('user')
-    if (stored) {
-      setUserId(JSON.parse(stored))
+    // Récupération des données utilisateur
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      console.log('Utilisateur connecté:', storedUser);
+      setUserId(JSON.parse(storedUser));
     }
-    // Écoute des messages entrants
-    const handleIncomingMessage = (message) => {
-      // message attendu = { roomId: string, sender: string, text: string, type: 'group' | 'contact' }
-      if (!message || !message.roomId) return;
-
-      if (message.type === 'group') {
-        setGroupMessages((prev) => ({
-          ...prev,
-          [message.roomId]: [...(prev[message.roomId] || []), { sender: message.sender, text: message.text }],
-        }));
-      } else if (message.type === 'contact') {
-        setContactMessages((prev) => ({
-          ...prev,
-          [message.roomId]: [...(prev[message.roomId] || []), { sender: message.sender, text: message.text }],
-        }));
-      }
-    };
 
     // Écouter la liste des utilisateurs connectés
-    s.on('activeUsers', (users) => {
-      console.log(users)
-      // users = tableau d'utilisateurs connectés, ex : [{ id, name }]
+    socket.on('activeUsers', (users) => {
+      console.log('Utilisateurs actifs:', users);
       setContacts(users);
     });
 
-    s.on('private-message', ({ from, content }) => {
-      console.log(from, content)
-      // from est le userId de l’émetteur
+    // Écouter les messages privés entrants
+    socket.on('private-message', ({ from, content, fromEmail }) => {
+      console.log('Message reçu:', { from, content, fromEmail });
+      console.log('fromEmail type:', typeof fromEmail);
+      console.log('fromEmail value:', fromEmail);
+      
       setContactMessages(prev => ({
         ...prev,
         [from]: [
           ...(prev[from] || []),
-          { sender: from, text: content }
+          { 
+            sender: from, 
+            text: content,
+            email: fromEmail
+          }
         ]
       }));
     });
 
-  // Demander la liste des utilisateurs connectés dès la connexion
-  s.emit('getActiveUsers');
+    // Demander la liste des utilisateurs connectés
+    socket.emit('getActiveUsers');
 
-  console.log(contacts)
-  if (contacts[activeContact]) {
-    const userId = contacts[activeContact].userId;
-
-    // Transformer les messages au bon format pour l'affichage
-    const formatted = historyMessages.map(msg => ({
-      sender: msg.fromUserId === userId ? userId : 'Me',
-      text: msg.content
-    }));
-
-    setContactMessages(prev => ({
-      ...prev,
-      [userId]: formatted
-    }));
-  }
-
-  return () => {
-    s.off('private-message'); 
-    s.off('message', handleIncomingMessage);
-    s.off('activeUsers');
-  };
-
+    // Nettoyage des listeners
+    return () => {
+      socket.off('private-message');
+      socket.off('activeUsers');
+    };
   }, []);
 
+  // Debug des contacts
   useEffect(() => {
-    console.log('contacts mis à jour:', contacts);
+    console.log('Contacts mis à jour:', contacts);
   }, [contacts]);
 
+  // Chargement de l'historique des messages quand on change de contact
   useEffect(() => {
-    console.log(socket)
-  }, [socket])
+    if (!userId?.id || !contacts[activeContact]?.userId) return;
 
-  useEffect(() => {
-
-    const loadMessage = async () => {
+    const loadMessages = async () => {
       try {
         const url = `http://localhost:3000/message?fromUserId=${userId.id}&toUserId=${contacts[activeContact].userId}`;
         const response = await fetch(url);
+        
         if (!response.ok) {
           throw new Error(`Erreur réseau : ${response.status}`);
         }
+        
         const data = await response.json();
         setHistoryMessages(data);
       } catch (error) {
         console.error("Erreur lors du chargement des messages :", error);
       }
     };
-    
 
-    loadMessage()
+    loadMessages();
+  }, [activeContact, userId, contacts]);
 
-  }, [activeContact])
-
+  // Formatage des messages historiques pour l'affichage
   useEffect(() => {
-    if (contacts[activeContact]) {
-      const userId = contacts[activeContact].userId;
-  
-      // Transformer les messages au bon format pour l'affichage
-      const formatted = historyMessages.map(msg => ({
-        sender: msg.fromUserId === userId ? userId : 'Me',
-        text: msg.content
-      }));
-  
-      setContactMessages(prev => ({
-        ...prev,
-        [userId]: formatted
-      }));
-    }
-  }, [historyMessages, activeContact]);
-  
+    if (!contacts[activeContact] || !historyMessages.length) return;
 
+    const contactUserId = contacts[activeContact].userId;
+    console.log("Historique des messages:", historyMessages);
+
+    const formattedMessages = historyMessages.map(msg => ({
+      sender: msg.fromUserId === contactUserId ? contactUserId : 'Me',
+      text: msg.content,
+      email: msg.email
+    }));
+
+    setContactMessages(prev => ({
+      ...prev,
+      [contactUserId]: formattedMessages
+    }));
+  }, [historyMessages, activeContact, contacts]);
+
+  // Debug des messages de contact
   useEffect(() => {
-    console.log(contactMessages)
-  }, [contactMessages])
+    console.log('Messages de contact:', contactMessages);
+  }, [contactMessages]);
 
+  // Envoi d'un nouveau message
   const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !socket || !contacts[activeContact]) return;
 
-    const roomId = view === 'groups' ? groups[activeGroup].id : contacts[activeContact].userId;
-
+    const contactUserId = contacts[activeContact].userId;
     const message = { sender: 'Me', text: newMessage.trim() };
 
-    // Ajout local
-    if (view === 'groups') {
-      setGroupMessages((prev) => ({
-        ...prev,
-        [roomId]: [...(prev[roomId] || []), message],
-      }));
-    } else {
-      setContactMessages((prev) => ({
-        ...prev,
-        [roomId]: [...(prev[roomId] || []), message],
-      }));
-    }
+    // Ajout local du message
+    setContactMessages(prev => ({
+      ...prev,
+      [contactUserId]: [...(prev[contactUserId] || []), message]
+    }));
 
-    if (view === 'contacts' && socket) {
-      console.log(contacts[activeContact])
-      const to = contacts[activeContact].userId;
-      socket.emit('private-message', {
-        to: String(to),
-        content: newMessage.trim()
-      });
-    }
+    // Envoi via socket
+    console.log('Contact actuel:', contacts[activeContact]);
+    console.log('Données utilisateur:', userId);
+    
+    socket.emit('private-message', {
+      to: String(contactUserId),
+      content: newMessage.trim(),
+      fromEmail: userId.email
+    });
 
     setNewMessage('');
   };
 
-  // Styles inchangés (copier-coller ou extraire dans un fichier séparé)
+  // Styles
   const styles = {
     page: {
       display: 'flex',
@@ -246,34 +191,6 @@ function MessengerPage() {
       padding: '2rem',
       gap: '2rem',
     },
-    groups: {
-      flex: 1,
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      paddingBottom: '1rem',
-    },
-    listContainer: {
-      flex: 1,
-      overflowY: 'auto',
-      marginBottom: '1rem',
-    },
-    groupBtn: (isActive) => ({
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      backgroundColor: 'transparent',
-      border: 'none',
-      color: isActive ? '#1CD500' : 'white',
-      fontWeight: isActive ? 'bold' : 'normal',
-      fontSize: '1.1rem',
-      cursor: 'pointer',
-      width: '100%',
-      textAlign: 'left',
-      padding: '0.4rem 0.6rem',
-      borderRadius: '0.5rem',
-      transition: 'background-color 0.3s',
-    }),
     chatBox: {
       flex: 3,
       backgroundColor: '#595959',
@@ -283,46 +200,6 @@ function MessengerPage() {
       flexDirection: 'column',
       justifyContent: 'space-between',
     },
-    iconBtnsContainer: {
-      display: 'flex',
-      gap: '1rem',
-      marginBottom: '0.5rem',
-      justifyContent: 'center',
-    },
-    iconBtn: (isActive) => ({
-      background: 'transparent',
-      border: 'none',
-      cursor: 'pointer',
-      padding: 0,
-      width: '2.5rem',
-      height: '2.5rem',
-      filter: isActive
-        ? 'brightness(1) saturate(3) drop-shadow(0 0 3px #1CD500)'
-        : 'none',
-      transition: 'filter 0.3s',
-    }),
-    iconImg: {
-      width: '100%',
-      height: '100%',
-      objectFit: 'contain',
-      userSelect: 'none',
-      pointerEvents: 'none',
-    },
-    actionBtn: {
-      backgroundColor: '#1CD500',
-      color: 'white',
-      border: 'none',
-      borderRadius: '1rem',
-      padding: '0.6rem 1.2rem',
-      fontSize: '1rem',
-      cursor: 'pointer',
-      alignSelf: 'center',
-      width: '90%',
-    },
-    messageSender: (isMe) => ({
-      color: isMe ? '#1CD500' : 'white',
-      fontWeight: isMe ? 'bold' : 'normal',
-    }),
     messages: {
       overflowY: 'auto',
       flex: 1,
@@ -355,6 +232,45 @@ function MessengerPage() {
       fontSize: '1rem',
       cursor: 'pointer',
     },
+    contactsList: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      paddingBottom: '1rem',
+    },
+    listContainer: {
+      flex: 1,
+      overflowY: 'auto',
+      marginBottom: '1rem',
+    },
+    contactBtn: (isActive) => ({
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      backgroundColor: 'transparent',
+      border: 'none',
+      color: isActive ? '#1CD500' : 'white',
+      fontWeight: isActive ? 'bold' : 'normal',
+      fontSize: '1.1rem',
+      cursor: 'pointer',
+      width: '100%',
+      textAlign: 'left',
+      padding: '0.4rem 0.6rem',
+      borderRadius: '0.5rem',
+      transition: 'background-color 0.3s',
+    }),
+    actionBtn: {
+      backgroundColor: '#1CD500',
+      color: 'white',
+      border: 'none',
+      borderRadius: '1rem',
+      padding: '0.6rem 1.2rem',
+      fontSize: '1rem',
+      cursor: 'pointer',
+      alignSelf: 'center',
+      width: '90%',
+    },
   };
 
   return (
@@ -380,15 +296,13 @@ function MessengerPage() {
             {currentMessages.map((msg, index) => (
               <div key={index}>
                 <strong>
-                  { msg.sender === 'Me'
-                      ? 'Me'
-                      : contacts.find(c => String(c.userId) === msg.sender)?.email || msg.sender
-                  }
+                  {msg.sender === 'Me' ? 'Me' : msg.email || msg.sender}
                 </strong>
                 <p style={{ margin: 0 }}>{msg.text}</p>
               </div>
             ))}
           </div>
+          
           <div style={styles.inputZone}>
             <span role="img" aria-label="image" style={styles.green}>🖼️</span>
             <input
@@ -398,54 +312,27 @@ function MessengerPage() {
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
             />
-            <button style={styles.sendBtn} onClick={handleSendMessage}>Envoyer</button>
+            <button style={styles.sendBtn} onClick={handleSendMessage}>
+              Envoyer
+            </button>
           </div>
         </div>
 
-        {/* Groups / Contacts List */}
-        <div style={styles.groups}>
-          <h2>{view === 'groups' ? 'Messagerie de groupe' : 'Contacts'}</h2>
+        {/* Contacts List */}
+        <div style={styles.contactsList}>
+          <h2>Contacts</h2>
+          
           <div style={styles.listContainer}>
-            {(view === 'groups' ? groups : contacts).map((item, i) => (
+            {contacts.map((contact, index) => (
               <button
-                key={item.id}
-                style={styles.groupBtn(
-                  (view === 'groups' ? activeGroup : activeContact) === i
-                )}
-                onClick={() => {
-                  if (view === 'groups') setActiveGroup(i);
-                  else setActiveContact(i);
-                }}
+                key={contact.userId}
+                style={styles.contactBtn(activeContact === index)}
+                onClick={() => setActiveContact(index)}
               >
-                {view === 'groups' ? item.name : item.email}
+                {contact.email}
               </button>
             ))}
           </div>
-          <div style={styles.iconBtnsContainer}>
-            <button
-              style={styles.iconBtn(view === 'groups')}
-              onClick={() => setView('groups')}
-              aria-label="Afficher groupes"
-            >
-              <img
-                style={styles.iconImg}
-                src="/src/assets/icons/group.svg"
-                alt="group"
-              />
-            </button>
-            <button
-              style={styles.iconBtn(view === 'contacts')}
-              onClick={() => setView('contacts')}
-              aria-label="Afficher contacts"
-            >
-              <img
-                style={styles.iconImg}
-                src="/src/assets/icons/user.svg"
-                alt="user"
-              />
-            </button>
-          </div>
-          <button style={styles.actionBtn}>Nouvelle discussion</button>
         </div>
       </div>
     </div>
