@@ -5,6 +5,8 @@ import { Server } from 'socket.io'; // <-- ICI, le bon import serveur
 import { registerUser } from './auth/register.js';
 import { loginUser } from './auth/login.js';
 import { savePrivateMessage, getPrivateMessage } from './messages/message.js';
+import { createPost, getAllPosts } from './publication/publication.js';
+import { createComment, getCommentsByPostId } from './comments/comments.js';
 
 const app = express();
 app.use(cors());
@@ -47,6 +49,62 @@ app.get('/message', (req, res) => {
   }
 
 })
+
+app.get('/publications', (req, res) => {
+  try {
+    const publications = getAllPosts();
+    res.json(publications);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des publications:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Ta route POST existante (déjà présente)
+app.post('/publication', (req, res) => {
+  const { userId, content } = req.body;
+  try {
+    const publication = createPost(userId, content);
+    res.status(201).json(publication);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Récupérer les commentaires d'une publication
+app.get('/comments/:publication_id', (req, res) => {
+  const { publication_id } = req.params;
+  try {
+    const comments = getCommentsByPostId(publication_id);
+    res.json(comments);
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Dans la route POST /comments
+app.post('/comments', (req, res) => {
+  const { user_id, publication_id, content } = req.body;
+  
+  console.log('Tentative de création de commentaire:', { user_id, publication_id, content });
+  
+  if (!user_id || !publication_id || !content) {
+    return res.status(400).json({ error: 'Tous les champs sont requis' });
+  }
+
+  try {
+    const comment = createComment(user_id, publication_id, content);
+    console.log('Commentaire créé:', comment);
+    res.status(201).json(comment);
+  } catch (err) {
+    console.error('Erreur détaillée:', err);
+    res.status(500).json({ 
+      error: 'Erreur serveur', 
+      details: err.message 
+    });
+  }
+});
+
 
 // Crée le serveur HTTP
 const server = http.createServer(app);
